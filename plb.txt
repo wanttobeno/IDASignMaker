@@ -1,0 +1,340 @@
+
+	P A R S E L I B
+	---------------
+
+PLB stands for parselib.
+It processes OMF object and library files and produces a pattern file.
+Command line:
+
+	parselib [-sw or @file] input-file pattern-file
+
+The command line switches may be placed in an indirect file - one switch per line.
+The input file is an object file or a library file. If the extension is omitted,
+"LIB" extension is assumed.
+The output file is a pattern file. Its default extension is "PAT".
+A pattern file is a simple text file. Each function is represented by one
+line (warning: the lines may be very-very long, tens of kilobytes, so don't
+edit pattern files with a text editor). Format of this file is described
+in the PAT.TXT file.
+
+Usually plb is launched without switches:
+
+	plb cl1 borland
+
+will take "cl2.lib" as input and produce "borland.pat" file.
+
+You may use the -a switch to append to the output file:
+
+	plb -a cl2 borland
+
+will append patterns of functions from "cl2.lib" to "borland.pat"
+The output file must exist if the -a switch is used.
+
+Description of switches
+-----------------------
+
+	-a	Append to the output file. The output file must exist and
+		its last line must be '---'
+
+	-c...	If the input file contains the "ctype" array, you may use
+		this switch to allow parselib to detect the "ctype" array and
+		produce a special record in the pattern file for it.
+		"Ctype" array requires special handling because it resides
+		in data segment and normally would be skipped by parselib.
+		You should specify ctype array name:
+
+			-cctype_name
+
+		Use this switch only if you are processing a non-standard C
+		library.
+
+	-d	Turn on debugging. Displays lots of debugging information.
+
+	-e	Skip unnamed functions. Experimental switch. I don't recommend
+		to use it - it is better to recognize even unnamed functions
+		rather than silently skip them.
+
+	-i	The input file is an IBM OMF file.
+		By default parselib assumes the input file to be a MS OMF file.
+
+	-l...	This switch is required only for startup object modules.
+		It should not be specified for regular libraries.
+		This switch contains information how to proceed if the
+		startup module is found in the executable file.
+		It allows you to specify names of signature files to be
+		applied automatically. Signature file names are separated by
+		':'. Optional signature files are specified as l=signame
+		Also, you may specify the OS type and the application type.
+		Format of this switch is signature names and directives
+		spearated by colons ':', for example:
+
+		      o=type:a=type:l=lib1/lib2/lib3:m=hints:s=off/signame
+
+		o=type
+			specifies OS type if the startup module is found.
+			Valid values (sigmake -ho displays them):
+			  1 MS DOS
+			  2 MS Windows
+			  4 OS/2
+			  8 Netware
+
+		a=type
+			specifies application type if the startup module is
+			found in the executable file.
+			Valid values are combination of the following
+			bits (sigmake -ha displays them):
+			  0001 console
+			  0002 graphics
+			  0004 program (EXE)
+			  0008 library (DLL)
+			  0010 driver  (VxD)
+			  0020 Single-threaded
+			  0040 Multi-threaded
+			  0080 16bit
+			  0100 32bit
+			When in question, don't specify a bit.
+
+		l=lib1/lib2/lib3...
+			Optional signatures. This directive may be omitted.
+			An optional signature file is not applied
+			automatically, but it will be marked with an asterisk
+			in the list of signature files.
+
+		m=hints
+			A simple program to find main() function. Format of
+			hints is decribed below. This directive may be omitted.
+
+		s=off/signame
+			Reference to secondary startup signature. Presence of
+			this directive means that IDA can't make decision
+			based on the recognition of one startup module.
+			IDA needs to make additional checks to select
+			proper signature file: these additional checks are
+			in the secondary signature file. The secondary
+			signature file will be applied to an address referenced
+			by an instruction at start+off (off is hexadecimal).
+			This directive must be the last item in the -l switch.
+			This directive may be omitted.
+		S=off/signame
+                        Almost the same thing as lowercase 's'. The difference
+                        between these switches is that the uppercase 'S' uses the
+                        start+off address as it is while
+                        the lowecase 's' tries to get the address referenced by the
+                        instruction. The start address mentioned in this switches
+                        is either the address where the signature was applied to
+                        (usually the entry point of the program) or the address
+                        after applying the main() hints (if they were specified
+                        before)
+		i=idcfile
+			An IDC file to invoke. The IDC file will be searched
+			in the IDC subdirectory of IDA.
+
+	-m...	The name of the library module. If this switch is specified,
+		parselib will process only the specified module, not the whole
+		library. This switch is mainly used for startup modules.
+
+	-n...	The name of the startup function. If this switch is specified,
+		parselib will start pattern at the specified function,
+		not at the module start. Signatures are applied to
+		the entry point of an executable file and therefore
+		the patterns should start at entry point too.
+
+	-o...	The offset of the startup entry point (hex). The pattern will start at it.
+		This is an alternative way to specify the start of a startup
+		pattern. Sometimes the entry point has no name and in this
+		case we are forced to use offsets instead of names.
+
+	-p##	Pattern length (default: 32)
+		Never use this switch, it is for debugging only.
+
+	-v	Verbose output
+
+	-w...	This switch has the same meaning as -c switch.
+		The only difference is that ctype array has 2-byte elements.
+
+	-z	Loosen input file format checks. Some library modules have
+		erroneous structure. This switch allows parselib to handle
+		them.
+
+
+Format of hints used to find main() function
+--------------------------------------------
+
+Hints are arranged as a simple program encoded in a text string.
+The string is processed from the left to the right. For the ease of explanation, let's
+imagine a virtual machine with the following registers:
+	PTR	- contains a pointer to hints string.
+		  initialized with the start of the hints string.
+	ADR	- contains the current linear address.
+		  initialized with the executable program entry point address.
+	MAIN	- contains a possible main() address. initialized with
+		  a bad address (i.e. the main() address in not known)
+	MAINNAME- contains a possible main() function name.
+	SAFE	- contains a 'safe' address. not initialized.
+	FLAG	- contains 1/0. Initialized with 0.
+
+The virtual machine takes a symbol at PTR, interprets it accordingly and
+moves PTR to the next symbol. The execution is stopped when one of the
+following conditions reached:
+	- the end of the string is reached. The address of the main()
+          function is in MAIN (unless it still contains the bad address)
+	- PTR points to a '/' symbol. It means that the main() function is found at ADR.
+	- illegal symbol at PTR is encountered.
+
+
+Elements of hints string (spaces are inserted for readibility only. they
+should not be present in the program string):
+
+  + <off>	ADR <- ADR + off.
+  		off is a hexadecimal number
+
+  - <off>	ADR <- ADR - off.
+  		off is a hexadecimal number
+
+  !		make instruction at ADR.
+  		stop execution if not possible to create instruction (or rollback safe execution)
+
+  #2		make 2-byte data item at ADR
+  		stop execution if not possible to create instruction (or rollback safe execution)
+
+  #4		make 4-byte data item at ADR
+  		stop execution if not possible to create instruction (or rollback safe execution)
+
+  &		follow data reference (ADR <- dref(ADR))
+		For example, if instruction at ADR is
+
+		  ADR:	push	offset somedata
+
+		then ADR <- address of somedata
+		if the current instruction at ADR doesn't refer to data,
+		then stop execution or rollback safe execution.
+
+  ^		follow code reference (ADR <- cref(ADR))
+		For example, if instruction at ADR is
+
+		  ADR:	call	somefunc
+
+		then ADR <- address of somefunc
+		if the current instruction at ADR doesn't refer to code,
+		then stop execution or rollback safe execution.
+
+  *0c
+  *0d
+  *1c
+  *1d
+  		make offset at ADR. general format is
+			*<opnum><type>
+		where opnum (operand number) is '0' or '1',
+		type is 'c' for cs or 'd' for ds.
+
+  / <name>	stop execution - we have found main() function. It is at ADR.
+  		Its name follows '/' sign. If the name is not specified,
+		its taken as '_main'.
+
+  ? <byte> ... ;
+  		Conditional.
+		Test a byte at ADR. If it is equal to <byte> (hexadecimal),
+		then continue execution. Otherwise skip ... part and jump
+		to position after ';'.
+		The ellipsis ... represents a sequence of any other symbols
+		here. Conditionals can't be included in each other.
+
+  ~<sigfile> / <+off> <funcname> ~ ... ;
+  		Apply a signature file at ADR-<off>.
+		If the specified <funcname> is found at ADR, then continue
+		execution. Otherwise jump to execution position after ';'.
+
+		sigfile - name of signature file to apply.
+			  default: first signature file specified in -l switch
+			  if sigfile == "-" then no signature file is applied,
+			  only the <funcname> is tested.
+
+		off	- offset from ADR. Must be hexadecimal 4-digit number
+			  preceded by + sign.
+			  default: 0
+
+		funcname - name of function to compare.
+			  default: WINMAIN
+
+		For example, the shortest form is:
+
+			~/~ ... ;
+
+		This will apply the first signature to ADR and test a name
+		appeared at ADR - it should be equal to WINMAIN.
+
+  [mainname]	MAIN     <- ADR
+  		MAINNAME <- mainname
+		Remember possible main() function address and name.
+		Default main() name is WINMAIN.
+
+  ( ... )	Switch to safe mode of execution. In this mode the execution
+		is not stopped if something went wrong (can't convert to
+		instruction, for example). In this case we jump to symbol
+		after ')' and set FLAG to 0.
+		Otherwise (if everything went ok), set FLAG to 1 when PTR is
+		at ')'.
+
+  ?? ... ;	Test FLAG. If it is set (equal to 1), then continue exeuction.
+  		Otherwise jump to symbol after ';'.
+		Conditionals can't be included in each other.
+
+  @sigfile@     plan to apply a signature file
+
+  Conditional semicolons (';') may be omitted.
+
+Examples
+--------
+
+	Please note that I give examples of most sophisticated usage of
+	-l switch. Usually you don't need it.
+
+-------------------------
+plb -a -lo=1:a=84:l=bc31tvd/bc31cls:bc31rtd:m=+EF^/  bcc\1.01\C0C.OBJ exe_bc31
+
+input file:	bcc\1.01\C0C.OBJ
+output file:	exe_bc31.pat
+		the output file should exist.
+		we will append to it.
+-l switch:
+	OS type is MS DOS		(o=1)
+	Application: 16 bit program	(a=84)
+	Optional signatures: bc31tvd.sig
+			     bc31cls.sig
+	Automatically apply: bc31rtd.sig
+	main() hints:
+		add 0xEF to entry point of executable
+		follow code reference (there is 'call' instruction there)
+		main() function is here, its name is _main
+
+
+-------------------------
+echo -lo=2:a=84:bh16rwin:l=bh16cls/bh16owl/bh16ocf/bh16dbe>bh.tmp
+plb -a @bh.tmp -lm=+AF^[]~/~+16^/ C0WC.OBJ  ne_bh.pat
+
+
+input file:	C0WC.OBJ
+output file:	ne_bh.pat
+		the output file should exist.
+		we will append to it.
+-l switch:
+	OS type is MS Windows		(o=2)
+	Application: 16 bit program	(a=84)
+	Automatically apply: bh16rwin
+	Optional signatures: bh16cls
+			     bh16owl
+			     bh16ocf
+			     bh16dbe
+	main() hints:
+ +AF		add 0xAF to entry point of executable
+ ^		follow code reference (there is 'call' instruction there)
+ []		remember the current address as possible WINMAIN address
+ ~/~		apply bc16rwin.sig to the current address. Test for WINMAIN
+ 		name. If don't match, then stop - WINMAIN is here (because
+		we saved it with [] operator). If name matches, then continue.
+		(it is likely that EasyWin program is here)
+ +16		add 16 to the current address (ADR)
+ ^		follow the code reference (there is a 'call' instruction there)
+ /		main() function is here, its name is _main
+
+-------------------------

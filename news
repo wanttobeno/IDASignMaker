@@ -1,0 +1,127 @@
+
+
+The following summarizes the enhancements made to FLAIR utilities
+
+
+plb
+---
+
+1.42	maximal number of virsegs is 1024
+1.43	LIBNAM record stops processing
+1.44	-m switch accepts number of module
+1.45	maximal number of virsegs is 4096
+	maximal number of comsegs is 4096
+	maximal number of names is 16384
+1.46    negative offsets of public names are allowed
+1.47    a bug with VIRDEF segments is fixed
+1.48    don't throw away long (>=0x8000) segments,
+        just truncate them
+        -x switch is added
+1.49    bad external references are not fatal anymore
+1.50    allow "" in the command line switches
+1.51    -s switch is added
+1.52    wildcards are supported
+
+pcf
+---
+
+1.07	TMS320C6 COFF support is added
+	-Z switch is added
+1.08	pcf could issue an erroneous fatal error message
+	about unknown relocation type
+1.09
+1.10    negative offsets of public names are allowed
+1.11    Windows CE support for ARM, SH3, SH4
+        Wildcards in the command line are supported
+        The output file name may be omitted
+1.12    H8/300 support
+1.13    AR archive member names could miss the first letter
+        sometimes
+1.14    fixed a bug with the coff file detection
+1.15    fixed a bug with the coff file symbol tables
+1.16    added AMD64 support
+1.17    added -M switch
+1.18    added more relocation types for x86
+
+pelf
+----
+
+1.0     created
+1.01    ELF AR libraries are supported
+1.02    ARM processor is supported
+1.03    IBM PC processor is supported
+1.04    AR module names separated by '\n' are supported
+1.05    R_ARM_PC13 relocation type is added
+1.06    added the -M switch
+
+
+pomf166
+-------
+
+1.00    first version
+
+
+ppsx
+----
+
+1.0     created
+
+
+ptmobj
+------
+
+1.0     created
+
+
+
+sigmake
+-------
+
+1.31	keep collisioned modules as unnamed modules
+1.32	fixed bug with directory names in input files
+1.33	don't keep collisions in startup signatures
+1.34    maximum number of excluded names is 16000
+1.35    negative offsets of public names are allowed
+        small_func_threshold is 8 but it counts only
+        defined bytes now
+        better handling of collisions
+1.36    -t switch works now
+        better error message about missing "---" marker
+        at the end of pat file
+1.37    maximum number of excluded names is 32000
+1.38    maximum number of leaves is 8192
+1.39    -P switch is added
+1.40    V6 signature files are supported
+        (number_of_modules is 32bit)
+1.41    fixed bug with startup sigs: references by
+        functions names are not allowed there
+1.42    refer to the docs in the collisions message
+1.43    added new processor codes to -hp help page
+1.44    V7 signature files are created (standard zip lib)
+1.45    global name have priority over local names
+        if we have several of them on the same address
+
+
+zipsig
+------
+
+1.00    created
+1.01    don't stop processing after errors
+1.02    new zip return codes
+1.04    V6 signature files are supported (number_of_modules is 32bit)
+1.05    V7 signature files are supported (standard zip lib)
+
+dumpsig
+-------
+
+1.12    -s switch is deleted. Allow running with 1 parameter
+1.13    fixed a bug in signature loading
+1.14    CTYPE_ALT is added
+1.15    fixed a bug in free_tree()
+1.16    dumpsig failed if too many choices/leaves
+1.17    LFF_COLL is added. checkmem() is added.
+1.18    negative offsets of public names are allowed
+1.19    V6 signature files are supported
+1.20    V7 signature files are supported; more processor codes
+
+
