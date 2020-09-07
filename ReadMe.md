@@ -20,7 +20,7 @@ lib2sig.bat libc
 ```
 
 ```
-自动创建文件夹libc_objs，将LIBC.LIB拷入，按任意键继续执行。
+自动创建对应lib名字的文件夹libc_objs，将LIBC.LIB拷入，按任意键继续执行。
 
 中间有提示按回车的，按回车
 
