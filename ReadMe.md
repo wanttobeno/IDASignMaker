@@ -2,6 +2,11 @@
 
 ### IDASigMaker
 
+该技术使IDA能够识别由受支持的编译器生成的标准库函数， 并大大提高了所生成的汇编的可用性和可读性。
+
+##### 原帖子
+
+[逆向技术之熟悉IDA工具](https://bbs.pediy.com/thread-224499.htm)
 
 
 #### 使用方法
@@ -27,20 +32,6 @@ lib2sig.bat libc
 ```
 
 
-##### 原帖子
-
-[逆向技术之熟悉IDA工具](https://bbs.pediy.com/thread-224499.htm)
-
-
-##### 参考资料
-
-
-[FLIRT Signature File Database](https://github.com/Maktm/FLIRTDB)
-
-
-[IDA pro Flair 制作静态库文件签名 (图文教程)](https://blog.csdn.net/cwg2552298/article/details/81749521)
-
-
 ##### 贴图说明
 
 ida原生显示
@@ -48,12 +39,12 @@ ida原生显示
 ![IDA原生显示](./1.jpg)
 
 
-导入整个lib的sig
+方法1：导入整个lib的sig
  
 ![vc6libc.jpg](vc6libc.jpg)
 
 
-导入单个api的sig
+方法2：导入单个api的sig
 
 ![导入的sig](./2.jpg)
 
@@ -63,6 +54,21 @@ ida原生显示
 ![sig导入后的效果](3.jpg)
 
 
+
+##### 参考资料
+
+[https://www.hex-rays.com/products/ida/tech/flirt/index.shtml](https://www.hex-rays.com/products/ida/tech/flirt/)
+
+
+[IDA pro Flair 制作静态库文件签名 (图文教程)](https://blog.csdn.net/cwg2552298/article/details/81749521)
+
+
+##### 一些制作好sig文件
+
+[FLIRT Signature File Database](https://github.com/Maktm/FLIRTDB)
+
+
+[IDA FLIRT Signature Database](https://github.com/push0ebp/sig-database)
 
 
 
