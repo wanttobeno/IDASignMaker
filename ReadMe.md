@@ -8,6 +8,7 @@
 
 [逆向技术之熟悉IDA工具](https://bbs.pediy.com/thread-224499.htm)
 
+工具版本 sigmake.exe v1.4.5  dumpsig.exe v1.20 
 
 #### 使用方法
 
@@ -54,6 +55,11 @@ ida原生显示
 ![sig导入后的效果](3.jpg)
 
 
+##### ida签名制造工具资源库 by killpy 
+
+[ida签名制造工具资源库](ida签名制造工具资源库) 
+
+sigmake.exe v1.4.8  dumpsig.exe v1.22
 
 ##### 参考资料
 
@@ -61,6 +67,10 @@ ida原生显示
 
 
 [IDA pro Flair 制作静态库文件签名 (图文教程)](https://blog.csdn.net/cwg2552298/article/details/81749521)
+
+
+[游戏开源库ida签名制造工具 by killpy](https://bbs.pediy.com/thread-248815.htm) 
+
 
 
 ##### 一些制作好sig文件

@@ -1,0 +1,307 @@
+
+/* ====================================================================================== */
+/* This file contains information about ELF relocations, for                              */
+/* use by the 'pelf' utility.                                                             */
+/*                                                                                        */
+/* Since 'pelf' is in charge of creating a '.pat' pattern file,                           */
+/* that contains sequences of bytes representing code to be later                         */
+/* matched in binaries, it is important that portions of that                             */
+/* code that is [link|run]time-dependent be ignored when trying to                        */
+/* match patterns.                                                                        */
+/*                                                                                        */
+/* For example, if pelf is processing a relocatable ELF file, which                       */
+/* contains the following Intel x86 code:                                                 */
+/* >>   call some_function                                                                */
+/* or, in binary form:                                                                    */
+/* >>   0xE8 0x00 0x00 0x00 0x00                                                          */
+/* and since the final address of 'some_function' is not known at                         */
+/* this time (i.e., it will be determined at link-time. For the moment,                   */
+/* it is filled with zeroes), the bytes for the address of 'some_function'                */
+/* that immediately follow the byte for the call opcode itself,                           */
+/* (thus, the zeroes) must be ignored and not present in the resulting .pat               */
+/* file.                                                                                  */
+/*                                                                                        */
+/* This is an easy scenario, as this relocation is simple. But, every                     */
+/* machine has its own set of relocations and, while in the example above,                */
+/* the relocation touches 4 full consecutive bytes, it's not always the                   */
+/* case.                                                                                  */
+/*                                                                                        */
+/* The tables contained in this file hold enough information for pelf to know             */
+/* what bytes to ignore when a given relocation is encountered.                           */
+/* Here is the format for those tables:                                                   */
+/* ----                                                                                   */
+/* TABLE <proc> [<proc>...]:                                                              */
+/*       <reloc-nr>, <offset-lsb>, <offset-msb>, <size>                                   */
+/*       ...                                                                              */
+/*                                                                                        */
+/* proc: The 'machine number', as specified in the ELF                                    */
+/*       specification: http://www.sco.com/developers/gabi/latest/ch4.eheader.html        */
+/*       Note that you can have more than 1 machine number to which                       */
+/*       the table of relocation informations applies.                                    */
+/* reloc-nr: The relocation number (machine-dependent).                                   */
+/*           E.g., if <proc> is 3 (i.e., EM_386), and <reloc-nr> is 2,                    */
+/*           then this line in the table contains relocation information                  */
+/*           for the relocation "R_386_PC32"                                              */
+/* offset-lsb: The offset, in bytes, starting at the beginning of the                     */
+/*             relocation field, where the data will be modified at                       */
+/*             relocation-time.                                                           */
+/* offset-msb: The same thing, but when the processor is big-endian.                      */
+/* size: The number of bytes that will be modified at relocation-time.                    */
+/* ----                                                                                   */
+/*                                                                                        */
+/* Take, for example, the ARM relocation ARM_THM_JUMP19: its bits are spread              */
+/* across 3 bytes, and that relocation is set to start at the beginning of the            */
+/* instruction.                                                                           */
+/* In this situation, we will define that relocation as follows:                          */
+/*      51,   0,   1,   3                                                                 */
+/*      ^     ^    ^    ^                                                                 */
+/*      |     |    |    `----- Spans on 3 bytes. I.e., 3 bytes to ignore.                 */
+/*      |     |    `---------- For big-endian CPUs: starts at byte #1.                    */
+/*      |     `--------------- For little-endian CPUs: starts at byte #0.                 */
+/*      `--------------------- Relocation nr.                                             */
+/*                                                                                        */
+/*                 _________________________________________________                      */
+/*                                                                                        */
+/* As an exercice, let's try adding the following relocations for the ARM machine:        */
+/*  -     /*R_ARM_THM_MOVW_PREL_NC*/49                                                              */
+/*  -     /*R_ARM_THM_MOVT_PREL*/50                                                                 */
+/*  -     /*R_ARM_THM_PC12*/54                                                                      */
+/*                                                                                        */
+/* The documentation states that their numbers are:                                       */
+/*  -     /*R_ARM_THM_MOVW_PREL_NC*/49: 49                                                          */
+/*  -     /*R_ARM_THM_MOVT_PREL*/50: 50                                                             */
+/*  -     /*R_ARM_THM_PC12*/54: 54                                                                  */
+/*                                                                                        */
+/* Looking at binutils' "elf32-arm.c" file lets us see their masks:                       */
+/*  -     /*R_ARM_THM_MOVW_PREL_NC*/49: 0x040f70ff                                                  */
+/*  -     /*R_ARM_THM_MOVT_PREL*/50: 0x040f70ff                                                     */
+/*  -     /*R_ARM_THM_PC12*/54: 0x040070ff                                                          */
+/*                                                                                        */
+/* Thus, we can see that for the first two relocations, the variable bits are             */
+/* scattered all over the 4 bytes of the instruction.                                     */
+/* We can't rely on any of the bytes to remain constant, so we'll have to mark            */
+/* all 4 of them as variable.                                                             */
+/* Additionally, since 4 bytes in a 4-byte instruction start at offset 0 regardless       */
+/* of whether it's little or big endian, we need to use offset 0 in both cases.           */
+/* Thus:                                                                                  */
+/*    49,   0,   0,   4                                                                   */
+/*    50,   0,   0,   4                                                                   */
+/*                                                                                        */
+/* The third relocation does have a fixed byte (00 in the mask), but unfortunately        */
+/* it's in the middle of the instruction, a variation which is not supported by           */
+/* pelf. So we'll have to mark all 4 bytes as well:                                       */
+/*    54,   0,   0,   4                                                                   */
+/*                                                                                        */
+/* Note: it is not always easy to find the documentation pertaining to the relocations    */
+/* you want to add support for in pelf. A notoriously helpful way to determine the way    */
+/* relocations are laid out is, as we just did in the example above, to take a peek into  */
+/* binutils' source files for the relevant architecture.                                  */
+/* ====================================================================================== */
+
+
+/* Note: Keeping the x86 on top, as it's probably the most often used */
+/* To understand negative offsets in this table see binutils, elf32-i386.c */
+TABLE 3 6:    /*EM_386*/                     /*EM_486*/                    
+      0,   0,   0,   0    /*R_386_NONE*/                
+      5,   0,   0,   0    /*R_386_COPY*/                
+      7,   0,   0,   4    /*R_386_JMP_SLOT*/            
+      9,   0,   0,   4    /*R_386_GOTOFF*/              
+     10,   0,   0,   4    /*R_386_GOTPC*/               
+      8,   0,   0,   4    /*R_386_RELATIVE*/            
+      4,   0,   0,   4    /*R_386_PLT32*/               
+      3,   0,   0,   4    /*R_386_GOT32*/               
+      2,   0,   0,   4    /*R_386_PC32*/                
+      1,   0,   0,   4    /*R_386_32*/                  
+      6,   0,   0,   4    /*R_386_GLOB_DAT*/            
+     14,   0,   0,   4    /*R_386_TLS_TPOFF*/           
+     15,  -2,  -2,   6    /*R_386_TLS_IE*/              
+     16,  -2,  -2,   6    /*R_386_TLS_GOTIE*/           
+     17,   0,   0,   4    /*R_386_TLS_LE*/              
+     18,  -3,  -3,  12    /*R_386_TLS_GD*/               /* this is not quite correct */
+     19,   0,   0,   4    /*R_386_TLS_LDM*/             
+     32,   0,   0,   4    /*R_386_TLS_LDO_32*/          
+     33,  -2,  -2,   6    /*R_386_TLS_IE_32*/           
+     34,  -2,  -2,  11    /*R_386_TLS_LE_32*/           
+     35,   0,   0,   4    /*R_386_TLS_DTPMOD32*/        
+     36,   0,   0,   4    /*R_386_TLS_DTPOFF32*/        
+     37,   0,   0,   4    /*R_386_TLS_TPOFF32*/         
+     39,  -1,  -1,   5    /*R_386_TLS_GOTDESC*/         
+     40,   0,   0,   2    /*R_386_TLS_DESC_CALL*/        /* call *(%eax) => xchg %ax,%ax */
+     20,   0,   0,   2    /*R_386_16*/                  
+     21,   0,   0,   2    /*R_386_PC16*/                
+     22,   0,   0,   1    /*R_386_8*/                   
+     23,   0,   0,   1    /*R_386_PC8*/                 
+
+TABLE 62:    /*EM_X86_64*/                 
+     10,   0,   0,   4    /*R_X86_64_32*/               
+     11,   0,   0,   4    /*R_X86_64_32S*/              
+      2,   0,   0,   4    /*R_X86_64_PC32*/             
+/* http://www.x86-64.org/documentation/abi.pdf $4.4 */
+/* http://people.redhat.com/drepper/tls.pdf */
+     22,   0,   0,   4    /*R_X86_64_GOTTPOFF*/         
+     23,   0,   0,   4    /*R_X86_64_TPOFF32*/          
+      4,   0,   0,   4    /*R_X86_64_PLT32*/            
+      9,   0,   0,   4    /*R_X86_64_GOTPCREL*/         
+      1,   0,   0,   8    /*R_X86_64_64*/               
+     19,   0,   0,   4    /*R_X86_64_TLSGD*/            
+     20,   0,   0,   4    /*R_X86_64_TLSLD*/            
+     21,   0,   0,   4    /*R_X86_64_DTPOFF32*/         
+
+TABLE 8:    /*EM_MIPS*/                   
+      2,   0,   0,   4    /*R_MIPS_32*/                 
+      3,   0,   0,   4    /*R_MIPS_REL*/                
+     12,   0,   0,   4    /*R_MIPS_GPREL32*/            
+      4,   0,   0,   4    /*R_MIPS_26*/                 
+     37,   0,   0,   4    /*R_MIPS_JALR*/               
+      5,   0,   2,   2    /*R_MIPS_HI16*/               
+     11,   0,   2,   2    /*R_MIPS_CALL*/               
+      9,   0,   2,   2    /*R_MIPS_GOT*/                
+      6,   0,   2,   2    /*R_MIPS_LO16*/               
+      7,   0,   2,   2    /*R_MIPS_GPREL*/              
+     19,   0,   2,   2    /*R_MIPS_GOT_DISP*/           
+     20,   0,   2,   2    /*R_MIPS_GOT_PAGE*/           
+     21,   0,   2,   2    /*R_MIPS_GOT_OFST*/           
+     22,   0,   2,   2    /*R_MIPS_GOT_HI16*/           
+     23,   0,   2,   2    /*R_MIPS_GOT_LO16*/           
+     24,   0,   2,   2    /*R_MIPS_SUB*/                
+
+TABLE 19:    /*EM_I960*/                   
+      0,   0,   0,   0    /*R_960_NONE*/                
+      2,   0,   0,   4    /*R_960_32*/                  
+      4,   0,   0,   4    /*R_960_SUB*/                 
+      3,   0,   1,   3    /*R_960_IP24*/                
+      5,   0,   1,   3    /*R_960_OPTCALL*/             
+      6,   4,   4,   4    /*R_960_OPTCALLX*/            
+      7,   4,   4,   4    /*R_960_OPTCALLXA*/           
+
+/* It is highly recommended to have a look at binutil's bfd/elf32-arm.c's */
+/* src_mask & dst_mask information to determine fixups sizes. */
+TABLE 40:    /*EM_ARM*/                    
+      0,   0,   0,   0    /*R_ARM_NONE*/                
+     40,   0,   0,   0    /*R_ARM_V4BX*/                
+      8,   0,   0,   1    /*R_ARM_ABS8*/                 /* Data */                    
+      7,   0,   0,   2    /*R_ARM_THM_ABS5*/             /* Thumb16 */                 
+    103,   0,   1,   1    /*R_ARM_THM_PC9*/             
+     11,   0,   1,   1    /*R_ARM_THM_PC8*/              /* Thumb16 */                 
+      6,   0,   2,   2    /*R_ARM_ABS12*/                /* ARM */                     
+      5,   0,   0,   2    /*R_ARM_ABS16*/                /* Data */                    
+    102,   0,   0,   2    /*R_ARM_THM_PC11*/             /* Thumb16? */                
+      9,   0,   0,   4    /*R_ARM_SBREL32*/              /* Data */                    
+      2,   0,   0,   4    /*R_ARM_ABS32*/                /* Data */                    
+    253,   0,   0,   4    /*R_ARM_RABS32*/               /* Data */                    
+      3,   0,   0,   4    /*R_ARM_REL32*/                /* Data */                    
+    252,   0,   0,   4    /*R_ARM_RREL32*/               /* Data */                    
+     96,   0,   0,   4    /*R_ARM_GOT_PREL*/            
+     27,   0,   0,   4    /*R_ARM_PLT32*/               
+     26,   0,   0,   4    /*R_ARM_GOT32*/               
+     25,   0,   0,   4    /*R_ARM_GOTPC*/               
+     24,   0,   0,   4    /*R_ARM_GOTOFF*/              
+     21,   0,   0,   4    /*R_ARM_GLOB_DAT*/            
+     22,   0,   0,   4    /*R_ARM_JUMP_SLOT*/           
+     18,   0,   0,   4    /*R_ARM_TLS_DTPOFF32*/        
+     19,   0,   0,   4    /*R_ARM_TLS_TPOFF32*/         
+     17,   0,   0,   4    /*R_ARM_TLS_DTPMOD32*/        
+     10,   0,   0,   4    /*R_ARM_THM_PC22*/             /* == R_ARM_THM_CALL. See "ARM IHI 0044D", 4.7.1.6 */
+      1,   0,   1,   3    /*R_ARM_PC24*/                
+      4,   0,   1,   3    /*R_ARM_PC13*/                
+     28,   0,   1,   3    /*R_ARM_CALL*/                
+     29,   0,   1,   3    /*R_ARM_JUMP24*/              
+     51,   0,   1,   3    /*R_ARM_THM_JUMP19*/          
+     30,   0,   0,   4    /*R_ARM_THM_JUMP24*/          
+     15,   0,   1,   3    /*R_ARM_XPC25*/               
+     16,   0,   0,   4    /*R_ARM_THM_XPC22*/           
+     47,   0,   0,   4    /*R_ARM_THM_MOVW_ABS_NC*/     
+     48,   0,   0,   4    /*R_ARM_THM_MOVT_ABS*/        
+    107,   0,   0,   4    /*R_ARM_TLS_IE32*/            
+    108,   0,   0,   4    /*R_ARM_TLS_LE32*/            
+     49,   0,   0,   4    /*R_ARM_THM_MOVW_PREL_NC*/    
+     50,   0,   0,   4    /*R_ARM_THM_MOVT_PREL*/       
+     54,   0,   0,   4    /*R_ARM_THM_PC12*/            
+     44,   0,   1,   3    /*R_ARM_MOVT_ABS*/            
+     43,   0,   1,   3    /*R_ARM_MOVW_ABS_NC*/         
+
+TABLE 93:    /*EM_ARCOMPACT*/              
+      0,   0,   0,   0    /*R_ARC_NONE*/                
+     52,   0,   0,   4    /*R_ARC_PLT32*/               
+     59,   0,   0,   4    /*R_ARC_GOT32*/               
+     58,   0,   0,   4    /*R_ARC_GOTPC*/               
+     57,   0,   0,   4    /*R_ARC_GOTOFF*/              
+     54,   0,   0,   4    /*R_ARC_GLOB_DAT*/            
+     55,   0,   0,   4    /*R_ARC_JMP_SLOT*/            
+     56,   0,   0,   4    /*R_ARC_RELATIVE*/            
+     16,   0,   0,   4    /*R_ARC_S25H_PCREL*/          
+     17,   0,   0,   4    /*R_ARC_S25W_PCREL*/          
+     27,   0,   0,   4    /*R_ARC_32_ME*/               
+      4,   0,   0,   4    /*R_ARC_32*/                  
+     29,   0,   0,   4    /*R_ARC_SECTOFF_ME*/          
+
+TABLE 20:    /*EM_PPC*/                    
+      0,   0,   0,   0    /*R_PPC_NONE*/                
+     19,   0,   0,   0    /*R_PPC_COPY*/                
+     21,   0,   0,   4    /*R_PPC_JMP_SLOT*/            
+     22,   0,   0,   4    /*R_PPC_RELATIVE*/            
+     20,   0,   0,   4    /*R_PPC_GLOB_DAT*/            
+      1,   0,   0,   4    /*R_PPC_ADDR32*/              
+     26,   0,   0,   4    /*R_PPC_REL32*/               
+      3,   0,   0,   2    /*R_PPC_ADDR16*/              
+      5,   0,   0,   2    /*R_PPC_ADDR16_HI*/           
+      6,   0,   0,   2    /*R_PPC_ADDR16_HA*/           
+      4,   0,   0,   2    /*R_PPC_ADDR16_LO*/           
+     14,   0,   0,   2    /*R_PPC_GOT16*/               
+     15,   0,   0,   2    /*R_PPC_GOT16_LO*/            
+     16,   0,   0,   2    /*R_PPC_GOT16_HI*/            
+     17,   0,   0,   2    /*R_PPC_GOT16_HA*/            
+     29,   0,   0,   2    /*R_PPC_PLT16_LO*/            
+     30,   0,   0,   2    /*R_PPC_PLT16_HI*/            
+     31,   0,   0,   2    /*R_PPC_PLT16_HA*/            
+     25,   0,   0,   2    /*R_PPC_UADDR16*/             
+     32,   0,   0,   2    /*R_PPC_SDAREL16*/            
+     33,   0,   0,   2    /*R_PPC_SECTOFF*/             
+     34,   0,   0,   2    /*R_PPC_SECTOFF_LO*/          
+     35,   0,   0,   2    /*R_PPC_SECTOFF_HI*/          
+     36,   0,   0,   2    /*R_PPC_SECTOFF_HA*/          
+    109,   0,   2,   2    /*R_PPC_EMB_SDA21*/           
+     11,   0,   2,   2    /*R_PPC_REL14*/               
+     18,   0,   1,   3    /*R_PPC_PLTREL24*/            
+     23,   0,   1,   3    /*R_PPC_LOCAL24PC*/           
+     10,   0,   1,   3    /*R_PPC_REL24*/               
+      2,   0,   0,   4    /*R_PPC_ADDR24*/              
+
+TABLE 21:    /*EM_PPC64*/                  
+     10,   0,   0,   3    /*R_PPC64_REL24*/             
+     38,   0,   0,   8    /*R_PPC64_ADDR64*/            
+     51,   0,   0,   8    /*R_PPC64_TOC*/               
+     47,   0,   0,   2    /*R_PPC64_TOC16*/             
+     63,   0,   0,   2    /*R_PPC64_TOC16_DS*/          
+     70,   0,   0,   2    /*R_PPC64_TPREL16_LO*/        
+     71,   0,   0,   2    /*R_PPC64_TPREL16_HI*/        
+     72,   0,   0,   2    /*R_PPC64_TPREL16_HA*/        
+     87,   0,   0,   2    /*R_PPC64_GOT_TPREL16_DS*/    
+     67,   0,   0,   8    /*R_PPC64_TLS*/               
+
+TABLE 53:    /*EM_6812*/                   
+      0,   0,   0,   0    /*R_M68HC11_NONE*/            
+      1,   0,   0,   1    /*R_M68HC11_8*/               
+      3,   0,   0,   1    /*R_M68HC11_LO8*/             
+      2,   0,   0,   1    /*R_M68HC11_HI8*/             
+      4,   0,   0,   1    /*R_M68HC11_PCREL_8*/         
+      7,   0,   0,   1    /*R_M68HC11_3B*/              
+      5,  -1,  -1,   2    /*R_M68HC11_16*/               /* !!! quite strange but seems to be right */
+      8,  -1,  -1,   2    /*R_M68HC11_PCREL_16*/        
+
+TABLE 42:    /*EM_SH*/                     
+      0,   0,   0,   0    /*R_SH_NONE*/                 
+    162,   0,   0,   4    /*R_SH_COPY*/                 
+    163,   0,   0,   4    /*R_SH_GLOB_DAT*/             
+    164,   0,   0,   4    /*R_SH_JMP_SLOT*/             
+    165,   0,   0,   4    /*R_SH_RELATIVE*/             
+      1,   0,   0,   4    /*R_SH_DIR32*/                
+     33,   0,   0,   2    /*R_SH_DIR16*/                
+     34,   0,   0,   1    /*R_SH_DIR8*/                 
+     39,   0,   0,   1    /*R_SH_DIR8S*/                
+    160,   0,   0,   4    /*R_SH_GOT32*/                
+    161,   0,   0,   4    /*R_SH_PLT32*/                
+    165,   0,   0,   4    /*R_SH_RELATIVE*/             
+    166,   0,   0,   4    /*R_SH_GOTOFF*/               
+    167,   0,   0,   4    /*R_SH_GOTPC*/                
+    168,   0,   0,   4    /*R_SH_GOTPLT32*/             

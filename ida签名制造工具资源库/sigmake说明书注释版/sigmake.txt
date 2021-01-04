@@ -1,0 +1,203 @@
+
+	S I G M A K E
+	-------------
+
+Sigmake takes pattern files as the input and creates a signature file.
+It can take several pattern files at once.
+Usage:
+
+	sigmake [-sw] pattern-file(s) sig-file
+
+where
+	switches (-sw) may be kept in indirect file '@file'
+	(one switch per line)
+
+input pattern files are file1+file2+file3...
+wildcard input file names are allowed too.
+the default extension of the input files is .PAT
+the default extension of the output file is .SIG
+The name of the output file should be no more than 8 symbols for compatibility.
+
+collision resolving
+-------------------
+Sigmake looks for and takes as the input file <outfile>.exc (<outfile> is name of
+output signature file). This file contains a list of excluded function names
+and other directives for sigmake. EXC file is a text file. Sigmake will
+automatically create an EXC file if it doesn't exist. It an EXC file exists, sigmake
+will append information to it.
+
+If sigmake creates an EXC file, then you must edit it and re-run sigmake.
+
+NOTE: although sigmake uses all information from pat files, it doesn't
+write everything into sig file. Some information during this process
+is lost and therefore the process is not reversible.
+
+Decription of switches
+----------------------
+
+	-x...  name of file with excluded function names exc错误文件名字 这里默认就行
+	       default is <outfile>.exc
+
+	-c     Check presence of ctype directive. If this switch is specified, 侦测c类型写入sig
+	       the input pattern files  must be prepared with -c switch of
+	       parselib.
+
+	-d...  debugging output file (default: <outfile>.err)  处理过程的错误提示信息存入的文件 用于调试
+	       This file contains dump of output signature file.
+
+	-n...  signature file title for IDA. 指定一下sig文件在ida中显示的库信息
+	       If not specified, "Unnamed sample library" is taken by default.
+	       This title will appear in the window of signatures in IDA.
+
+
+	-D...  name is data name, not code name 不建议用 指定一些符号名字 ida遇到他们不会转换为指令 启动签名用
+	       Not recommended to use, because the same effect may be achieved
+	       by the directive in EXC file.
+
+	-a...  application types the signature may be applied to. 启动签名的时候指定目标类型 
+	       Combination of bits. When in doubt, set a bit.
+	       (list of bits can be displayed by -ha switch)
+			0001 console
+			0002 graphics
+			0004 program (EXE)
+			0008 library (DLL)
+			0010 driver  (VxD)
+			0020 Single-threaded
+			0040 Multi-threaded
+			0080 16bit
+			0100 32bit
+               GUI version of IDA does not use this information
+	       TXT version: The signature file will appear in the abridged list of
+	       signatures if bit is set.
+
+	-o...  os types the signature may be applied to.启动签名用 os类型
+	       Combination of bits. When in doubt, set a bit.
+	       (list of bits can be displayed by -ho switch)
+	       		0001 MS DOS
+			0002 MS Windows
+			0004 OS/2
+			0008 Netware
+               GUI version of IDA does not use this information
+	       TXT version: The signature file will appear in the abridged list of
+	       signatures if bit is set.
+
+	-f...  file format types the signature may be applied to.启动签名用 目标文件类型
+	       Combination of bits. When in doubt, set a bit.
+	       (list of bits can be displayed by -hf switch)
+	       		00000001 MS DOS EXE File
+			00000002 MS DOS COM File
+			00000004 Binary File
+			00000008 MS DOS Driver
+			00000010 New Executable (NE)
+			00000020 Intel Hex Object File
+			00000040 MOS Technology Hex Object File
+			00000080 Linear Executable (LX)
+			00000100 Linear Executable (LE)
+			00000200 Netware Loadable Module (NLM)
+			00000400 Common Object File Format (COFF)
+			00000800 Portable Executable (PE)
+			00001000 Used-defined format
+			00002000 Object Module Format (OMF)
+			00004000 S-record format
+			00008000 ZIP archive
+               GUI version of IDA does not use this information
+	       TXT version: The signature file will appear in the abridged list of
+	       signatures if bit is set.
+
+	-p...  processor id 启动签名 表示处理器架构
+	       (list of ids can be displayed by -hp switch or taken
+                from idp.hpp in IDA SDK)
+               GUI version of IDA does not use processor ids
+	       TXT version: the signature file will appear in the abridged list of
+	       signatures if the id is set correctly.
+	       Default is 0 (IBM PC).
+
+	-s     make startup signature.表示生成的sig是启动签名 和普通区别是 不能把目标位置的某个函数从地址替换为符号 因为刚开始反汇编 哪里来的特征码
+	       This switch must be specified for startup signatures.
+	       Sigmake produces slightly different signature file if this
+	       switch is specified. For example, references to functions can't
+	       be used in startup signatures because a startup signature is
+	       applied at the start of disassembling and no function names
+	       are present yet.
+
+	-t...  minimal length of normal function. if function is smaller 不知道啥意思
+	       then a fixup reference is generated. default: 16(decimal)
+
+	-h#    help (#:a-apptype,o-ostype,f-formats,p-processor)帮助文件
+
+        -r     do not use fixup information when trying to tell similar patterns apart.找到两个特征码相同的sig字符 不使用存在的信息 来区别他们 
+
+        -L     to specify the length of patterns in the .pat file (default: 32 bytes).特征码长度 默认32字节
+
+        -l...  use -l<r|i><pattern> to tell sigmake what to do with some 遇到sig相同的 不匹配 或者直接阻止匹配
+               functions/labels when it encounters them.
+               -lr<pattern>: reject functions matching the pattern
+               -li<pattern>: ignore functions matching the pattern, when
+                             searching for duplicate entries from the
+                             .pat files.
+
+        -X     to dump extended information about collisions, in the .exc file. 遇到问题 生成exc文件 相信信息 每一矛盾行下面都是这行sig的各种信息 比如crc值 特征码 函数长度等等
+
+
+
+Format of EXC file
+------------------
+
+EXC file is a text file.
+Lines starting with a semicolon are comment lines.
+Sigmake stops reading EXC file when it encounters a line starting with
+
+;------
+
+and will append information from that file position. Since this line
+is generated each time sigmake creates an EXC file, don't forget to
+remove them. Otherwise sigmake will ignore your modifications in the
+EXC file.
+Sigmake automatically creates EXC file if it is not present.
+It starts EXC file with the following lines:
+
+;--------- (delete these lines to allow sigmake to read this file)
+; add '+' at the start of a line to select a module
+; add '-' if you are not sure about the selection
+; do nothing if you want to exclude all modules
+
+EXC file contains names of functions to be excluded from the signature file.
+Sigmake writes names in groups. Each group represents one or more collisions.
+Each module is represented with one line, for example:
+
+_remove                                           	00 0000 558BEC1EB441C55604CD211F720433C0EB0450E8....5DC3................
+_unlink                                           	00 0000 558BEC1EB441C55604CD211F720433C0EB0450E8....5DC3................
+
+At the start of the line there are function names. The rest of the line contains
+information about the module (checksums, pattern and other) needed to
+distinguish one module from another with the same name).
+Your task is to insert '+' or '-' sign at the start of the lines to resolve
+collisions.
++ means that you are sure about your selection,
+- means that the name will appear as a comment in IDA.
+
+For example, if we decide to exclude _remove from the signature and leave
+_unlink, then we insert a '+' sign:
+
+_remove                                           	00 0000 558BEC1EB441C55604CD211F720433C0EB0450E8....5DC3................
++_unlink                                           	00 0000 558BEC1EB441C55604CD211F720433C0EB0450E8....5DC3................
+
+
+This way we order to exclude the _remove() function and keep the _unlink() function in the
+signature.
+
+
+Two directives may appear in the EXC file:
+
+ DATA=name
+
+note that the first character is a space character - this is common to all
+directives in the EXC file. This directive means
+that the specified name is a data name, not code name and IDA will not
+convert bytes at this name to an instruction.
+
+ LIBNAME=library name
+
+has the same meaning as -n switch: specifies the name of the signature file which appears
+in the window of signatures.
+
